@@ -1,0 +1,13 @@
+.git
+.github
+.vscode
+.next
+node_modules
+coverage
+.vercel
+.env
+.env.*
+*.log
+*.tsbuildinfo
+next-env.d.ts
+README.md

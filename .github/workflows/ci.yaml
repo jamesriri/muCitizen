@@ -1,0 +1,52 @@
+name: CI/CD Quality & Security Gate
+
+on:
+  push:
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    name: Lint, Typecheck & Production Build
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/test?sslmode=disable"
+      DATABASE_URL_UNPOOLED: "postgresql://postgres:postgres@localhost:5432/test?sslmode=disable"
+      NEXTAUTH_SECRET: "ci-dummy-super-secret-key-that-is-at-least-32-characters"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      AWS_ENDPOINT_URL_S3: "https://mock.storage.neon.tech"
+      AWS_ACCESS_KEY_ID: "mock_key"
+      AWS_SECRET_ACCESS_KEY: "mock_secret"
+      AWS_REGION: "us-east-2"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.34.7
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Strict TypeScript Verification
+        run: pnpm exec tsc --noEmit
+
+      - name: Next.js Production Build Gate
+        run: pnpm build

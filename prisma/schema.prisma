@@ -1,0 +1,145 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CITIZEN
+  OFFICER
+  SUPER_ADMIN
+}
+
+enum RequestStatus {
+  PENDING
+  IN_REVIEW
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phoneNumber  String?
+  nationalId   String?  @unique
+  emailRequestUpdates Boolean @default(true)
+  smsRequestUpdates   Boolean @default(false)
+  role         Role     @default(CITIZEN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submittedRequests ServiceRequest[] @relation("CitizenRequests")
+  assignedRequests  ServiceRequest[] @relation("OfficerAssignedRequests")
+  auditActions      AuditLog[]       @relation("ActorAuditLogs")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String
+  slaHours    Int      @default(72)
+  iconName    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests    ServiceRequest[]
+
+  @@index([slug])
+}
+
+model ServiceRequest {
+  id              String        @id @default(cuid())
+  referenceNumber String        @unique
+  title           String
+  description     String        @db.Text
+  status          RequestStatus @default(PENDING)
+  priority        Priority      @default(MEDIUM)
+  
+  locationAddress String
+  latitude        Float?
+  longitude       Float?
+
+  slaDueDate      DateTime
+  resolvedAt      DateTime?
+
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id])
+
+  citizenId       String
+  citizen         User          @relation("CitizenRequests", fields: [citizenId], references: [id], onDelete: Cascade)
+
+  assignedToId    String?
+  assignedTo      User?         @relation("OfficerAssignedRequests", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  attachments     Attachment[]
+  auditLogs       AuditLog[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([referenceNumber])
+  @@index([status])
+  @@index([priority])
+  @@index([citizenId])
+  @@index([assignedToId])
+  @@index([categoryId])
+}
+
+model Attachment {
+  id               String         @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  fileUrl          String
+  fileName         String
+  fileSize         Int
+  mimeType         String
+  createdAt        DateTime       @default(now())
+
+  @@index([serviceRequestId])
+}
+
+model AuditLog {
+  id               String         @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  
+  actorId          String?
+  actor            User?          @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  action           String
+  fromStatus       RequestStatus?
+  toStatus         RequestStatus?
+  comment          String?        @db.Text
+  isInternal       Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+
+  @@index([serviceRequestId])
+  @@index([actorId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
